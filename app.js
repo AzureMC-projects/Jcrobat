@@ -1,259 +1,405 @@
-:root {
-  --bg: #1a1a2e;
-  --bg-light: #16213e;
-  --bg-ribbon: #0f3460;
-  --bg-sidebar: #16213e;
-  --border: #1e3a5f;
-  --text: #e0e0e0;
-  --text-dim: #8899aa;
-  --accent: #4fc3f7;
-  --accent-hover: #81d4fa;
-  --primary: #2196f3;
-  --primary-hover: #42a5f5;
-  --danger: #ef5350;
-  --success: #66bb6a;
+ import * as pdfjsLib from 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/6.3.289/pdf.min.mjs';
+
+pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/6.3.289/pdf.worker.min.mjs';
+
+// ─── State ───────────────────────────────────────────────
+let pdfDoc = null;
+let pdfLibDoc = null;
+let currentPage = 1;
+let zoom = 1.0;
+let activeTool = null;
+let drawing = false;
+let drawStart = null;
+let currentTab = 'tools';
+
+// ─── DOM ─────────────────────────────────────────────────
+const $ = (id) => document.getElementById(id);
+const canvasContainer = $('canvas-container');
+const overlayCanvas = $('overlay-canvas');
+const overlayCtx = overlayCanvas.getContext('2d');
+const pageNav = $('page-nav');
+const viewer = $('viewer');
+
+// ─── INIT ────────────────────────────────────────────────
+async function init() {
+  const doc = await PDFLib.PDFDocument.create();
+  const font = await doc.embedFont(PDFLib.StandardFonts.Helvetica);
+  const fontBold = await doc.embedFont(PDFLib.StandardFonts.HelveticaBold);
+
+  for (let i = 1; i <= 3; i++) {
+    const page = doc.addPage([612, 792]);
+    page.drawText('Jcrobat - Sample Document', { x: 50, y: 720, size: 28, font: fontBold, color: PDFLib.rgb(0.1, 0.2, 0.6) });
+    page.drawText(`Page ${i}`, { x: 50, y: 680, size: 18, font });
+    page.drawText('This is a pre-loaded document.', { x: 50, y: 640, size: 14, font });
+    page.drawText('Edit it, add text, highlight, draw,', { x: 50, y: 620, size: 14, font });
+    page.drawText('merge, split, rotate, stamp — then download.', { x: 50, y: 600, size: 14, font });
+    page.drawLine({ start: { x: 50, y: 570 }, end: { x: 562, y: 570 }, thickness: 1, color: PDFLib.rgb(0.5, 0.5, 0.5) });
+    page.drawText('Try the ribbon buttons above!', { x: 50, y: 550, size: 14, font });
+  }
+
+  const bytes = await doc.save();
+  await loadPDFBytes(bytes);
 }
 
-* { margin: 0; padding: 0; box-sizing: border-box; }
-
-body {
-  font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, sans-serif;
-  height: 100vh;
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-  background: var(--bg);
-  color: var(--text);
-  font-size: 13px;
+// ─── Load PDF ────────────────────────────────────────────
+async function loadPDFBytes(bytes) {
+  const data = new Uint8Array(bytes);
+  pdfDoc = await pdfjsLib.getDocument({ data: data.slice() }).promise;
+  pdfLibDoc = await PDFLib.PDFDocument.load(data);
+  currentPage = 1;
+  renderPageNav();
+  await renderPage(1);
+  updateStatus();
 }
 
-/* ─── Top Bar ─────────────────────────────────────────── */
-.topbar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 6px 12px;
-  background: var(--bg-light);
-  border-bottom: 1px solid var(--border);
-  height: 36px;
+// ─── Render (auto-fit) ───────────────────────────────────
+async function renderPage(num) {
+  currentPage = num;
+  const page = await pdfDoc.getPage(num);
+  const viewport = page.getViewport({ scale: zoom });
+
+  canvasContainer.innerHTML = '';
+  const canvas = document.createElement('canvas');
+  canvas.width = viewport.width;
+  canvas.height = viewport.height;
+  canvasContainer.appendChild(canvas);
+
+  const ctx = canvas.getContext('2d');
+  await page.render({ canvasContext: ctx, viewport }).promise;
+
+  // Position overlay
+  requestAnimationFrame(() => {
+    const cRect = canvas.getBoundingClientRect();
+    const vRect = viewer.getBoundingClientRect();
+    overlayCanvas.width = viewport.width;
+    overlayCanvas.height = viewport.height;
+    overlayCanvas.style.width = viewport.width + 'px';
+    overlayCanvas.style.height = viewport.height + 'px';
+    overlayCanvas.style.left = (cRect.left - vRect.left + viewer.scrollLeft) + 'px';
+    overlayCanvas.style.top = (cRect.top - vRect.top + viewer.scrollTop) + 'px';
+    overlayCtx.clearRect(0, 0, overlayCanvas.width, overlayCanvas.height);
+  });
+
+  $('page-indicator').textContent = `Page ${num} of ${pdfDoc.numPages}`;
+  $('zoom-indicator').textContent = `${Math.round(zoom * 100)}%`;
+
+  document.querySelectorAll('.page-thumb').forEach((el, i) => {
+    el.classList.toggle('active', i + 1 === num);
+  });
 }
 
-.topbar-left { display: flex; align-items: center; gap: 12px; }
-.logo { font-size: 1.1rem; font-weight: 700; color: var(--accent); }
-.doc-name { color: var(--text-dim); font-size: 0.8rem; }
-
-.topbar-right { display: flex; align-items: center; gap: 8px; font-size: 0.8rem; color: var(--text-dim); }
-.sep { opacity: 0.4; }
-
-.icon-btn {
-  background: transparent;
-  border: 1px solid var(--border);
-  color: var(--text);
-  width: 26px; height: 26px;
-  border-radius: 4px;
-  cursor: pointer;
-  font-size: 0.9rem;
-  display: flex; align-items: center; justify-content: center;
-}
-.icon-btn:hover { background: var(--border); }
-
-/* ─── Ribbon ──────────────────────────────────────────── */
-.ribbon {
-  background: var(--bg-ribbon);
-  border-bottom: 1px solid var(--border);
-  min-height: 90px;
+function fitToPage() {
+  if (!pdfDoc) return;
+  const page = pdfDoc.getPage(currentPage);
+  const baseViewport = page.then(p => p.getViewport({ scale: 1 }));
+  baseViewport.then(v => {
+    const availW = viewer.clientWidth - 48;
+    const availH = viewer.clientHeight - 48;
+    zoom = Math.min(availW / v.width, availH / v.height);
+    zoom = Math.max(0.25, Math.min(zoom, 4));
+    renderPage(currentPage);
+  });
 }
 
-.ribbon-tabs { display: flex; gap: 0; padding: 4px 8px 0; }
-
-.tab {
-  background: transparent;
-  border: none;
-  color: var(--text-dim);
-  padding: 6px 16px;
-  cursor: pointer;
-  font-size: 0.8rem;
-  border-radius: 4px 4px 0 0;
-  transition: all 0.15s;
-}
-.tab:hover { color: var(--text); background: rgba(255,255,255,0.05); }
-.tab.active { color: var(--accent); background: var(--bg-ribbon); border-bottom: 2px solid var(--accent); }
-
-.ribbon-panel {
-  display: flex;
-  gap: 0;
-  padding: 8px 12px 12px;
-  align-items: flex-end;
+function renderPageNav() {
+  pageNav.innerHTML = '';
+  for (let i = 1; i <= pdfDoc.numPages; i++) {
+    const div = document.createElement('div');
+    div.className = 'page-thumb';
+    div.innerHTML = `<span class="page-thumb-num">${i}</span><span>Page ${i}</span>`;
+    div.addEventListener('click', () => renderPage(i));
+    pageNav.appendChild(div);
+  }
 }
 
-.ribbon-group {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  padding: 0 12px;
-  border-right: 1px solid var(--border);
-}
-.ribbon-group:last-child { border-right: none; }
-
-.ribbon-group-label {
-  font-size: 0.65rem;
-  color: var(--text-dim);
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-  margin-bottom: 6px;
+function updateStatus() {
+  if (!pdfLibDoc) return;
+  const size = new Blob([pdfLibDoc.save()]).size;
+  $('file-size').textContent = `${(size / 1024).toFixed(1)} KB`;
+  $('doc-info').textContent = `${pdfDoc.numPages} pages`;
 }
 
-.ribbon-group-items { display: flex; gap: 4px; }
+// ─── Ribbon Tabs ─────────────────────────────────────────
+document.querySelectorAll('.tab').forEach(tab => {
+  tab.addEventListener('click', () => {
+    document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+    document.querySelectorAll('.ribbon-panel').forEach(p => p.classList.add('hidden'));
+    tab.classList.add('active');
+    currentTab = tab.dataset.panel;
+    $(`panel-${currentTab}`).classList.remove('hidden');
+  });
+});
 
-.ribbon-btn {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 2px;
-  background: transparent;
-  border: 1px solid transparent;
-  color: var(--text);
-  padding: 6px 10px;
-  border-radius: 4px;
-  cursor: pointer;
-  font-size: 0.7rem;
-  min-width: 52px;
-  transition: all 0.15s;
-}
-.ribbon-btn:hover { background: rgba(255,255,255,0.08); border-color: var(--border); }
-.ribbon-btn.active { background: rgba(79,195,247,0.15); border-color: var(--accent); color: var(--accent); }
-.ribbon-btn.primary { background: var(--primary); color: white; border-color: var(--primary); }
-.ribbon-btn.primary:hover { background: var(--primary-hover); }
+// ─── Zoom ────────────────────────────────────────────────
+$('zoom-in').addEventListener('click', () => { zoom = Math.min(zoom + 0.25, 4); renderPage(currentPage); });
+$('zoom-out').addEventListener('click', () => { zoom = Math.max(zoom - 0.25, 0.25); renderPage(currentPage); });
+$('btn-fit').addEventListener('click', fitToPage);
 
-.ribbon-icon { font-size: 1.2rem; line-height: 1; }
+// ─── Sidebar toggle ──────────────────────────────────────
+$('btn-toggle-sidebar').addEventListener('click', () => {
+  $('sidebar').classList.toggle('collapsed');
+  setTimeout(fitToPage, 250);
+});
 
-/* ─── Main Area ───────────────────────────────────────── */
-.main-area { flex: 1; display: flex; overflow: hidden; }
+// ─── Open ────────────────────────────────────────────────
+$('btn-open').addEventListener('click', () => $('file-input').click());
+$('file-input').addEventListener('change', async (e) => {
+  const file = e.target.files[0];
+  if (file) {
+    $('doc-name').textContent = file.name;
+    const bytes = await file.arrayBuffer();
+    await loadPDFBytes(bytes);
+  }
+});
 
-/* Sidebar */
-.sidebar {
-  width: 200px;
-  background: var(--bg-sidebar);
-  border-right: 1px solid var(--border);
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-  transition: width 0.2s;
-}
-.sidebar.collapsed { width: 0; }
+// ─── Merge ───────────────────────────────────────────────
+$('btn-merge').addEventListener('click', () => $('merge-input').click());
+$('merge-input').addEventListener('change', async (e) => {
+  const files = Array.from(e.target.files);
+  if (!files.length || !pdfLibDoc) return;
+  for (const file of files) {
+    const bytes = await file.arrayBuffer();
+    const otherDoc = await PDFLib.PDFDocument.load(bytes);
+    const pages = await pdfLibDoc.copyPages(otherDoc, otherDoc.getPageIndices());
+    pages.forEach((p) => pdfLibDoc.addPage(p));
+  }
+  const newBytes = await pdfLibDoc.save();
+  await loadPDFBytes(newBytes);
+  $('merge-input').value = '';
+});
 
-.sidebar-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 8px 12px;
-  font-size: 0.75rem;
-  font-weight: 600;
-  color: var(--text-dim);
-  text-transform: uppercase;
-  border-bottom: 1px solid var(--border);
-}
+// ─── Split ───────────────────────────────────────────────
+$('btn-split').addEventListener('click', () => {
+  showToolOptions('split-options');
+});
 
-.page-nav { flex: 1; overflow-y: auto; padding: 8px; display: flex; flex-direction: column; gap: 6px; }
+$('btn-apply-split').addEventListener('click', async () => {
+  const rangeStr = $('split-range').value.trim();
+  if (!rangeStr || !pdfLibDoc) return;
+  const indices = parseRange(rangeStr, pdfLibDoc.getPageCount());
+  if (!indices.length) return;
+  const newDoc = await PDFLib.PDFDocument.create();
+  const pages = await newDoc.copyPages(pdfLibDoc, indices);
+  pages.forEach((p) => newDoc.addPage(p));
+  const bytes = await newDoc.save();
+  await loadPDFBytes(bytes);
+  hideToolOptions();
+});
 
-.page-thumb {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 8px 10px;
-  background: rgba(255,255,255,0.03);
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  cursor: pointer;
-  font-size: 0.8rem;
-  transition: all 0.15s;
-}
-.page-thumb:hover { background: rgba(255,255,255,0.06); }
-.page-thumb.active { border-color: var(--accent); background: rgba(79,195,247,0.1); }
-.page-thumb-num { font-weight: 600; color: var(--text-dim); min-width: 20px; }
-.page-thumb.active .page-thumb-num { color: var(--accent); }
-
-/* Viewer */
-.viewer {
-  flex: 1;
-  overflow: auto;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  padding: 24px;
-  position: relative;
-  background: #2a2a3e;
-  background-image: radial-gradient(circle at 50% 50%, #333350 0%, #1a1a2e 100%);
-}
-
-#canvas-container {
-  position: relative;
-  display: flex;
-  justify-content: center;
+function parseRange(str, total) {
+  const parts = str.split(',').map(s => s.trim());
+  const result = [];
+  for (const part of parts) {
+    if (part.includes('-')) {
+      const [a, b] = part.split('-').map(Number);
+      for (let i = a; i <= b && i <= total; i++) if (i >= 1) result.push(i - 1);
+    } else {
+      const n = parseInt(part);
+      if (n >= 1 && n <= total) result.push(n - 1);
+    }
+  }
+  return [...new Set(result)];
 }
 
-#canvas-container canvas {
-  box-shadow: 0 8px 32px rgba(0,0,0,0.5), 0 2px 8px rgba(0,0,0,0.3);
-  border-radius: 2px;
-  max-width: 100%;
-  height: auto;
+// ─── Delete Page ─────────────────────────────────────────
+$('btn-delete-page').addEventListener('click', async () => {
+  if (!pdfLibDoc || pdfLibDoc.getPageCount() <= 1) return;
+  pdfLibDoc.removePage(currentPage - 1);
+  const bytes = await pdfLibDoc.save();
+  await loadPDFBytes(bytes);
+});
+
+// ─── Rotate ──────────────────────────────────────────────
+$('btn-rotate').addEventListener('click', async () => {
+  if (!pdfLibDoc) return;
+  const page = pdfLibDoc.getPage(currentPage - 1);
+  const current = page.getRotation().angle || 0;
+  page.setRotation(PDFLib.degrees((current + 90) % 360));
+  const bytes = await pdfLibDoc.save();
+  await loadPDFBytes(bytes);
+});
+
+// ─── Add Text ────────────────────────────────────────────
+$('btn-addtext').addEventListener('click', () => {
+  showToolOptions('text-options');
+});
+
+$('btn-apply-text').addEventListener('click', async () => {
+  if (!pdfLibDoc) return;
+  const text = $('text-input').value;
+  if (!text) return;
+  const x = parseFloat($('text-x').value) || 50;
+  const y = parseFloat($('text-y').value) || 700;
+  const size = parseFloat($('text-size').value) || 24;
+  const [r, g, b] = $('text-color').value.split(',').map(Number);
+  const page = pdfLibDoc.getPage(currentPage - 1);
+  const font = await pdfLibDoc.embedFont(PDFLib.StandardFonts.Helvetica);
+  page.drawText(text, { x, y, size, font, color: PDFLib.rgb(r, g, b) });
+  const bytes = await pdfLibDoc.save();
+  await loadPDFBytes(bytes);
+  hideToolOptions();
+});
+
+// ─── Stamp ───────────────────────────────────────────────
+$('btn-stamp').addEventListener('click', () => {
+  showToolOptions('stamp-options');
+});
+
+$('btn-apply-stamp').addEventListener('click', async () => {
+  if (!pdfLibDoc) return;
+  const text = $('stamp-text').value;
+  if (!text) return;
+  const page = pdfLibDoc.getPage(currentPage - 1);
+  const { width, height } = page.getSize();
+  const font = await pdfLibDoc.embedFont(PDFLib.StandardFonts.HelveticaBold);
+  const size = 48;
+  const textWidth = font.widthOfTextAtSize(text, size);
+  const x = (width - textWidth) / 2;
+  const y = height / 2;
+  page.drawText(text, { x, y, size, font, color: PDFLib.rgb(1, 0, 0), opacity: 0.6 });
+  const bytes = await pdfLibDoc.save();
+  await loadPDFBytes(bytes);
+  hideToolOptions();
+});
+
+// ─── Highlight ───────────────────────────────────────────
+$('btn-highlight').addEventListener('click', () => {
+  setActiveTool(activeTool === 'highlight' ? null : 'highlight');
+});
+
+// ─── Draw ────────────────────────────────────────────────
+$('btn-draw').addEventListener('click', () => {
+  setActiveTool(activeTool === 'draw' ? null : 'draw');
+});
+
+function setActiveTool(tool) {
+  activeTool = tool;
+  overlayCanvas.classList.toggle('hidden', !tool);
+  $('tool-indicator').textContent = tool ? `Active: ${tool}` : '';
+  document.querySelectorAll('.ribbon-btn').forEach(b => b.classList.remove('active'));
+  if (tool === 'highlight') $('btn-highlight').classList.add('active');
+  if (tool === 'draw') $('btn-draw').classList.add('active');
 }
 
-#overlay-canvas {
-  position: absolute;
-  top: 0; left: 0;
-  cursor: crosshair;
-  z-index: 10;
+overlayCanvas.addEventListener('mousedown', (e) => {
+  if (!activeTool) return;
+  drawing = true;
+  drawStart = { x: e.offsetX, y: e.offsetY };
+});
+
+overlayCanvas.addEventListener('mousemove', (e) => {
+  if (!drawing || !activeTool) return;
+  const x = e.offsetX, y = e.offsetY;
+  if (activeTool === 'draw') {
+    overlayCtx.beginPath();
+    overlayCtx.moveTo(drawStart.x, drawStart.y);
+    overlayCtx.lineTo(x, y);
+    overlayCtx.strokeStyle = '#ef5350';
+    overlayCtx.lineWidth = 2;
+    overlayCtx.stroke();
+  } else if (activeTool === 'highlight') {
+    overlayCtx.clearRect(0, 0, overlayCanvas.width, overlayCanvas.height);
+    overlayCtx.fillStyle = 'rgba(255, 235, 59, 0.35)';
+    overlayCtx.fillRect(
+      Math.min(drawStart.x, x), Math.min(drawStart.y, y),
+      Math.abs(x - drawStart.x), Math.abs(y - drawStart.y)
+    );
+  }
+});
+
+overlayCanvas.addEventListener('mouseup', async (e) => {
+  if (!drawing || !activeTool) return;
+  drawing = false;
+  const x = e.offsetX, y = e.offsetY;
+
+  const page = pdfLibDoc.getPage(currentPage - 1);
+  const { width, height } = page.getSize();
+  const scaleX = width / overlayCanvas.width;
+  const scaleY = height / overlayCanvas.height;
+
+  if (activeTool === 'highlight') {
+    const pdfX1 = Math.min(drawStart.x, x) * scaleX;
+    const pdfX2 = Math.max(drawStart.x, x) * scaleX;
+    const pdfY1 = height - Math.max(drawStart.y, y) * scaleY;
+    const pdfY2 = height - Math.min(drawStart.y, y) * scaleY;
+    page.drawRectangle({
+      x: pdfX1, y: pdfY1,
+      width: pdfX2 - pdfX1, height: pdfY2 - pdfY1,
+      color: PDFLib.rgb(1, 0.92, 0.23), opacity: 0.4
+    });
+  } else if (activeTool === 'draw') {
+    page.drawLine({
+      start: { x: drawStart.x * scaleX, y: height - drawStart.y * scaleY },
+      end: { x: x * scaleX, y: height - y * scaleY },
+      thickness: 2,
+      color: PDFLib.rgb(0.94, 0.33, 0.31)
+    });
+  }
+
+  const bytes = await pdfLibDoc.save();
+  await loadPDFBytes(bytes);
+  setActiveTool(null);
+});
+
+// ─── Reorder ─────────────────────────────────────────────
+$('btn-page-up').addEventListener('click', async () => {
+  if (!pdfLibDoc || currentPage <= 1) return;
+  const a = currentPage - 2, b = currentPage - 1;
+  const temp = pdfLibDoc.getPage(a);
+  pdfLibDoc.insertPage(a, pdfLibDoc.getPage(b));
+  pdfLibDoc.removePage(b + 1);
+  pdfLibDoc.insertPage(b, temp);
+  pdfLibDoc.removePage(a);
+  const bytes = await pdfLibDoc.save();
+  await loadPDFBytes(bytes);
+});
+
+$('btn-page-down').addEventListener('click', async () => {
+  if (!pdfLibDoc || currentPage >= pdfDoc.numPages) return;
+  const a = currentPage - 1, b = currentPage;
+  const temp = pdfLibDoc.getPage(a);
+  pdfLibDoc.insertPage(a, pdfLibDoc.getPage(b));
+  pdfLibDoc.removePage(b + 1);
+  pdfLibDoc.insertPage(b, temp);
+  pdfLibDoc.removePage(a);
+  const bytes = await pdfLibDoc.save();
+  await loadPDFBytes(bytes);
+});
+
+// ─── Download ────────────────────────────────────────────
+$('btn-save').addEventListener('click', async () => {
+  if (!pdfLibDoc) return;
+  const bytes = await pdfLibDoc.save();
+  const blob = new Blob([bytes], { type: 'application/pdf' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'jcrobat-output.pdf';
+  a.click();
+  URL.revokeObjectURL(url);
+});
+
+// ─── Export Page as PNG ──────────────────────────────────
+$('btn-save-png').addEventListener('click', async () => {
+  const canvas = canvasContainer.querySelector('canvas');
+  if (!canvas) return;
+  const a = document.createElement('a');
+  a.href = canvas.toDataURL('image/png');
+  a.download = `page-${currentPage}.png`;
+  a.click();
+});
+
+// ─── Tool Options Bar ────────────────────────────────────
+function showToolOptions(id) {
+  $('tool-options').classList.remove('hidden');
+  document.querySelectorAll('.tool-option-set').forEach(s => s.classList.add('hidden'));
+  $(id).classList.remove('hidden');
 }
 
-/* ─── Tool Options Bar ────────────────────────────────── */
-.tool-options {
-  background: var(--bg-light);
-  border-top: 1px solid var(--border);
-  padding: 8px 16px;
-  display: flex;
-  align-items: center;
-  gap: 8px;
+function hideToolOptions() {
+  $('tool-options').classList.add('hidden');
 }
 
-.tool-option-set { display: flex; align-items: center; gap: 8px; }
-.tool-option-set input, .tool-option-set select {
-  background: var(--bg);
-  border: 1px solid var(--border);
-  color: var(--text);
-  padding: 5px 8px;
-  border-radius: 4px;
-  font-size: 0.8rem;
-}
-.tool-option-set input[type="text"] { width: 200px; }
-.tool-option-set input[type="number"] { width: 60px; }
-.tool-option-set button.primary {
-  background: var(--primary);
-  color: white;
-  border: none;
-  padding: 5px 14px;
-  border-radius: 4px;
-  cursor: pointer;
-  font-weight: 600;
-  font-size: 0.8rem;
-}
-.tool-option-set button.primary:hover { background: var(--primary-hover); }
-.tool-option-set span { font-size: 0.8rem; color: var(--text-dim); }
-
-/* ─── Status Bar ──────────────────────────────────────── */
-.status-bar {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 4px 16px;
-  background: var(--bg-light);
-  border-top: 1px solid var(--border);
-  font-size: 0.72rem;
-  color: var(--text-dim);
-  height: 28px;
-}
-
-#tool-indicator { color: var(--accent); font-weight: 600; }
-
-/* ─── Utilities ───────────────────────────────────────── */
-.hidden { display: none !important; }   
+// ─── GO ──────────────────────────────────────────────────
+init();
+window.addEventListener('resize', () => { if (pdfDoc) fitToPage(); });   
