@@ -24,7 +24,7 @@ body {
 .toolbar-actions { display: flex; flex-wrap: wrap; gap: 6px; }
 
 .toolbar-actions button {
-  background: #313244;
+  background: #3134;
   color: #cdd6f4;
   border: 1px solid #45475a;
   padding: 6px 10px;
