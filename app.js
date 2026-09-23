@@ -1,11 +1,14 @@
 import * as pdfjsLib from 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/6.3.289/pdf.min.mjs';
 
+// ✅ THE FIX — worker must be set BEFORE any getDocument call
+pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/6.3.289/pdf.worker.min.mjs';
+
 // ─── State ───────────────────────────────────────────────
 let pdfDoc = null;
 let pdfLibDoc = null;
 let currentPage = 1;
 let zoom = 1.0;
-let activeTool = null; // 'highlight' | 'draw' | null
+let activeTool = null;
 let drawing = false;
 let drawStart = null;
 
@@ -25,7 +28,7 @@ async function init() {
 
   for (let i = 1; i <= 3; i++) {
     const page = doc.addPage([612, 792]);
-    page.drawText(`Jcrobat - Sample Document`, { x: 50, y: 720, size: 28, font: fontBold, color: PDFLib.rgb(0.1, 0.2, 0.6) });
+    page.drawText('Jcrobat - Sample Document', { x: 50, y: 720, size: 28, font: fontBold, color: PDFLib.rgb(0.1, 0.2, 0.6) });
     page.drawText(`Page ${i}`, { x: 50, y: 680, size: 18, font });
     page.drawText('This is a pre-loaded document.', { x: 50, y: 640, size: 14, font });
     page.drawText('Edit it, add text, highlight, draw,', { x: 50, y: 620, size: 14, font });
@@ -45,7 +48,7 @@ async function loadPDFBytes(bytes) {
   pdfLibDoc = await PDFLib.PDFDocument.load(data);
   currentPage = 1;
   renderPageNav();
-  renderPage(1);
+  await renderPage(1);
 }
 
 // ─── Open file (optional) ────────────────────────────────
@@ -73,13 +76,17 @@ async function renderPage(num) {
   const ctx = canvas.getContext('2d');
   await page.render({ canvasContext: ctx, viewport }).promise;
 
-  // Size overlay to match
+  // Size & position overlay to match canvas
   overlayCanvas.width = viewport.width;
   overlayCanvas.height = viewport.height;
   overlayCanvas.style.width = viewport.width + 'px';
   overlayCanvas.style.height = viewport.height + 'px';
-  overlayCanvas.style.left = canvas.offsetLeft + 'px';
-  overlayCanvas.style.top = canvas.offsetTop + 'px';
+  // Position overlay on top of the rendered canvas
+  const canvasRect = canvas.getBoundingClientRect();
+  const viewerRect = $('viewer').getBoundingClientRect();
+  overlayCanvas.style.position = 'absolute';
+  overlayCanvas.style.left = (canvasRect.left - viewerRect.left + $('viewer').scrollLeft) + 'px';
+  overlayCanvas.style.top = (canvasRect.top - viewerRect.top + $('viewer').scrollTop) + 'px';
   overlayCtx.clearRect(0, 0, overlayCanvas.width, overlayCanvas.height);
 
   $('page-indicator').textContent = `Page ${num} of ${pdfDoc.numPages}`;
@@ -127,10 +134,8 @@ $('btn-split').addEventListener('click', () => $('split-input-area').classList.t
 $('btn-apply-split').addEventListener('click', async () => {
   const rangeStr = $('split-range').value.trim();
   if (!rangeStr || !pdfLibDoc) return;
-
   const indices = parseRange(rangeStr, pdfLibDoc.getPageCount());
   if (!indices.length) return;
-
   const newDoc = await PDFLib.PDFDocument.create();
   const pages = await newDoc.copyPages(pdfLibDoc, indices);
   pages.forEach((p) => newDoc.addPage(p));
@@ -160,8 +165,6 @@ $('btn-delete-page').addEventListener('click', async () => {
   pdfLibDoc.removePage(currentPage - 1);
   const bytes = await pdfLibDoc.save();
   await loadPDFBytes(bytes);
-  if (currentPage > pdfDoc.numPages) currentPage = pdfDoc.numPages;
-  renderPage(currentPage);
 });
 
 // ─── Rotate ──────────────────────────────────────────────
@@ -172,7 +175,6 @@ $('btn-rotate').addEventListener('click', async () => {
   page.setRotation(PDFLib.degrees((current + 90) % 360));
   const bytes = await pdfLibDoc.save();
   await loadPDFBytes(bytes);
-  renderPage(currentPage);
 });
 
 // ─── Add Text ────────────────────────────────────────────
@@ -193,7 +195,6 @@ $('btn-apply-text').addEventListener('click', async () => {
   page.drawText(text, { x, y, size, font, color: PDFLib.rgb(0, 0, 0) });
   const bytes = await pdfLibDoc.save();
   await loadPDFBytes(bytes);
-  renderPage(currentPage);
 });
 
 // ─── Highlight ───────────────────────────────────────────
@@ -246,7 +247,6 @@ overlayCanvas.addEventListener('mouseup', async (e) => {
   drawing = false;
   const x = e.offsetX, y = e.offsetY;
 
-  // Convert canvas coords to PDF coords (PDF origin is bottom-left)
   const page = pdfLibDoc.getPage(currentPage - 1);
   const { width, height } = page.getSize();
   const scaleX = width / overlayCanvas.width;
@@ -263,13 +263,9 @@ overlayCanvas.addEventListener('mouseup', async (e) => {
       color: PDFLib.rgb(1, 1, 0), opacity: 0.4
     });
   } else if (activeTool === 'draw') {
-    const pdfX1 = drawStart.x * scaleX;
-    const pdfY1 = height - drawStart.y * scaleY;
-    const pdfX2 = x * scaleX;
-    const pdfY2 = height - y * scaleY;
     page.drawLine({
-      start: { x: pdfX1, y: pdfY1 },
-      end: { x: pdfX2, y: pdfY2 },
+      start: { x: drawStart.x * scaleX, y: height - drawStart.y * scaleY },
+      end: { x: x * scaleX, y: height - y * scaleY },
       thickness: 2,
       color: PDFLib.rgb(0.95, 0.32, 0.43)
     });
@@ -277,22 +273,13 @@ overlayCanvas.addEventListener('mouseup', async (e) => {
 
   const bytes = await pdfLibDoc.save();
   await loadPDFBytes(bytes);
-  renderPage(currentPage);
   setActiveTool(null);
 });
 
 // ─── Reorder Pages ───────────────────────────────────────
 $('btn-page-up').addEventListener('click', async () => {
   if (!pdfLibDoc || currentPage <= 1) return;
-  await swapPages(currentPage - 2, currentPage - 1);
-});
-
-$('btn-page-down').addEventListener('click', async () => {
-  if (!pdfLibDoc || currentPage >= pdfDoc.numPages) return;
-  await swapPages(currentPage - 1, currentPage);
-});
-
-async function swapPages(a, b) {
+  const a = currentPage - 2, b = currentPage - 1;
   const temp = pdfLibDoc.getPage(a);
   pdfLibDoc.insertPage(a, pdfLibDoc.getPage(b));
   pdfLibDoc.removePage(b + 1);
@@ -300,8 +287,19 @@ async function swapPages(a, b) {
   pdfLibDoc.removePage(a);
   const bytes = await pdfLibDoc.save();
   await loadPDFBytes(bytes);
-  renderPage(currentPage);
-}
+});
+
+$('btn-page-down').addEventListener('click', async () => {
+  if (!pdfLibDoc || currentPage >= pdfDoc.numPages) return;
+  const a = currentPage - 1, b = currentPage;
+  const temp = pdfLibDoc.getPage(a);
+  pdfLibDoc.insertPage(a, pdfLibDoc.getPage(b));
+  pdfLibDoc.removePage(b + 1);
+  pdfLibDoc.insertPage(b, temp);
+  pdfLibDoc.removePage(a);
+  const bytes = await pdfLibDoc.save();
+  await loadPDFBytes(bytes);
+});
 
 // ─── Download ────────────────────────────────────────────
 $('btn-save').addEventListener('click', async () => {
