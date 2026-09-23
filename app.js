@@ -1,4 +1,4 @@
- import * as pdfjsLib from 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/6.3.289/pdf.min.mjs';
+import * as pdfjsLib from 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/6.3.289/pdf.min.mjs';
 
 pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/6.3.289/pdf.worker.min.mjs';
 
@@ -10,15 +10,15 @@ let zoom = 1.0;
 let activeTool = null;
 let drawing = false;
 let drawStart = null;
-let currentTab = 'tools';
 
 // ─── DOM ─────────────────────────────────────────────────
 const $ = (id) => document.getElementById(id);
-const canvasContainer = $('canvas-container');
+const pdfCanvas = $('pdf-canvas');
 const overlayCanvas = $('overlay-canvas');
 const overlayCtx = overlayCanvas.getContext('2d');
-const pageNav = $('page-nav');
+const pageWrapper = $('page-wrapper');
 const viewer = $('viewer');
+const pageNav = $('page-nav');
 
 // ─── INIT ────────────────────────────────────────────────
 async function init() {
@@ -48,38 +48,48 @@ async function loadPDFBytes(bytes) {
   pdfLibDoc = await PDFLib.PDFDocument.load(data);
   currentPage = 1;
   renderPageNav();
-  await renderPage(1);
+  await fitToPage();
   updateStatus();
 }
 
-// ─── Render (auto-fit) ───────────────────────────────────
+// ─── Fit to page ─────────────────────────────────────────
+async function fitToPage() {
+  if (!pdfDoc) return;
+  const page = await pdfDoc.getPage(currentPage);
+  const baseViewport = page.getViewport({ scale: 1 });
+  const availW = viewer.clientWidth - 48;
+  const availH = viewer.clientHeight - 48;
+  zoom = Math.min(availW / baseViewport.width, availH / baseViewport.height);
+  zoom = Math.max(0.25, Math.min(zoom, 4));
+  await renderPage(currentPage);
+}
+
+// ─── Render page ─────────────────────────────────────────
 async function renderPage(num) {
   currentPage = num;
   const page = await pdfDoc.getPage(num);
   const viewport = page.getViewport({ scale: zoom });
 
-  canvasContainer.innerHTML = '';
-  const canvas = document.createElement('canvas');
-  canvas.width = viewport.width;
-  canvas.height = viewport.height;
-  canvasContainer.appendChild(canvas);
+  // Set canvas size
+  pdfCanvas.width = viewport.width;
+  pdfCanvas.height = viewport.height;
+  pdfCanvas.style.width = viewport.width + 'px';
+  pdfCanvas.style.height = viewport.height + 'px';
 
-  const ctx = canvas.getContext('2d');
+  // Set overlay to same size
+  overlayCanvas.width = viewport.width;
+  overlayCanvas.height = viewport.height;
+  overlayCanvas.style.width = viewport.width + 'px';
+  overlayCanvas.style.height = viewport.height + 'px';
+
+  // Render PDF
+  const ctx = pdfCanvas.getContext('2d');
   await page.render({ canvasContext: ctx, viewport }).promise;
 
-  // Position overlay
-  requestAnimationFrame(() => {
-    const cRect = canvas.getBoundingClientRect();
-    const vRect = viewer.getBoundingClientRect();
-    overlayCanvas.width = viewport.width;
-    overlayCanvas.height = viewport.height;
-    overlayCanvas.style.width = viewport.width + 'px';
-    overlayCanvas.style.height = viewport.height + 'px';
-    overlayCanvas.style.left = (cRect.left - vRect.left + viewer.scrollLeft) + 'px';
-    overlayCanvas.style.top = (cRect.top - vRect.top + viewer.scrollTop) + 'px';
-    overlayCtx.clearRect(0, 0, overlayCanvas.width, overlayCanvas.height);
-  });
+  // Clear overlay
+  overlayCtx.clearRect(0, 0, overlayCanvas.width, overlayCanvas.height);
 
+  // Update UI
   $('page-indicator').textContent = `Page ${num} of ${pdfDoc.numPages}`;
   $('zoom-indicator').textContent = `${Math.round(zoom * 100)}%`;
 
@@ -88,25 +98,12 @@ async function renderPage(num) {
   });
 }
 
-function fitToPage() {
-  if (!pdfDoc) return;
-  const page = pdfDoc.getPage(currentPage);
-  const baseViewport = page.then(p => p.getViewport({ scale: 1 }));
-  baseViewport.then(v => {
-    const availW = viewer.clientWidth - 48;
-    const availH = viewer.clientHeight - 48;
-    zoom = Math.min(availW / v.width, availH / v.height);
-    zoom = Math.max(0.25, Math.min(zoom, 4));
-    renderPage(currentPage);
-  });
-}
-
 function renderPageNav() {
   pageNav.innerHTML = '';
   for (let i = 1; i <= pdfDoc.numPages; i++) {
     const div = document.createElement('div');
     div.className = 'page-thumb';
-    div.innerHTML = `<span class="page-thumb-num">${i}</span><span>Page ${i}</span>`;
+    div.textContent = `Page ${i}`;
     div.addEventListener('click', () => renderPage(i));
     pageNav.appendChild(div);
   }
@@ -125,8 +122,7 @@ document.querySelectorAll('.tab').forEach(tab => {
     document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
     document.querySelectorAll('.ribbon-panel').forEach(p => p.classList.add('hidden'));
     tab.classList.add('active');
-    currentTab = tab.dataset.panel;
-    $(`panel-${currentTab}`).classList.remove('hidden');
+    $(`panel-${tab.dataset.panel}`).classList.remove('hidden');
   });
 });
 
@@ -169,10 +165,7 @@ $('merge-input').addEventListener('change', async (e) => {
 });
 
 // ─── Split ───────────────────────────────────────────────
-$('btn-split').addEventListener('click', () => {
-  showToolOptions('split-options');
-});
-
+$('btn-split').addEventListener('click', () => showToolOptions('split-options'));
 $('btn-apply-split').addEventListener('click', async () => {
   const rangeStr = $('split-range').value.trim();
   if (!rangeStr || !pdfLibDoc) return;
@@ -220,10 +213,7 @@ $('btn-rotate').addEventListener('click', async () => {
 });
 
 // ─── Add Text ────────────────────────────────────────────
-$('btn-addtext').addEventListener('click', () => {
-  showToolOptions('text-options');
-});
-
+$('btn-addtext').addEventListener('click', () => showToolOptions('text-options'));
 $('btn-apply-text').addEventListener('click', async () => {
   if (!pdfLibDoc) return;
   const text = $('text-input').value;
@@ -241,10 +231,7 @@ $('btn-apply-text').addEventListener('click', async () => {
 });
 
 // ─── Stamp ───────────────────────────────────────────────
-$('btn-stamp').addEventListener('click', () => {
-  showToolOptions('stamp-options');
-});
-
+$('btn-stamp').addEventListener('click', () => showToolOptions('stamp-options'));
 $('btn-apply-stamp').addEventListener('click', async () => {
   if (!pdfLibDoc) return;
   const text = $('stamp-text').value;
@@ -254,23 +241,15 @@ $('btn-apply-stamp').addEventListener('click', async () => {
   const font = await pdfLibDoc.embedFont(PDFLib.StandardFonts.HelveticaBold);
   const size = 48;
   const textWidth = font.widthOfTextAtSize(text, size);
-  const x = (width - textWidth) / 2;
-  const y = height / 2;
-  page.drawText(text, { x, y, size, font, color: PDFLib.rgb(1, 0, 0), opacity: 0.6 });
+  page.drawText(text, { x: (width - textWidth) / 2, y: height / 2, size, font, color: PDFLib.rgb(1, 0, 0), opacity: 0.6 });
   const bytes = await pdfLibDoc.save();
   await loadPDFBytes(bytes);
   hideToolOptions();
 });
 
-// ─── Highlight ───────────────────────────────────────────
-$('btn-highlight').addEventListener('click', () => {
-  setActiveTool(activeTool === 'highlight' ? null : 'highlight');
-});
-
-// ─── Draw ────────────────────────────────────────────────
-$('btn-draw').addEventListener('click', () => {
-  setActiveTool(activeTool === 'draw' ? null : 'draw');
-});
+// ─── Highlight & Draw ────────────────────────────────────
+$('btn-highlight').addEventListener('click', () => setActiveTool(activeTool === 'highlight' ? null : 'highlight'));
+$('btn-draw').addEventListener('click', () => setActiveTool(activeTool === 'draw' ? null : 'draw'));
 
 function setActiveTool(tool) {
   activeTool = tool;
@@ -311,28 +290,22 @@ overlayCanvas.addEventListener('mouseup', async (e) => {
   if (!drawing || !activeTool) return;
   drawing = false;
   const x = e.offsetX, y = e.offsetY;
-
   const page = pdfLibDoc.getPage(currentPage - 1);
   const { width, height } = page.getSize();
   const scaleX = width / overlayCanvas.width;
   const scaleY = height / overlayCanvas.height;
 
   if (activeTool === 'highlight') {
-    const pdfX1 = Math.min(drawStart.x, x) * scaleX;
-    const pdfX2 = Math.max(drawStart.x, x) * scaleX;
-    const pdfY1 = height - Math.max(drawStart.y, y) * scaleY;
-    const pdfY2 = height - Math.min(drawStart.y, y) * scaleY;
-    page.drawRectangle({
-      x: pdfX1, y: pdfY1,
-      width: pdfX2 - pdfX1, height: pdfY2 - pdfY1,
-      color: PDFLib.rgb(1, 0.92, 0.23), opacity: 0.4
-    });
+    const x1 = Math.min(drawStart.x, x) * scaleX;
+    const x2 = Math.max(drawStart.x, x) * scaleX;
+    const y1 = height - Math.max(drawStart.y, y) * scaleY;
+    const y2 = height - Math.min(drawStart.y, y) * scaleY;
+    page.drawRectangle({ x: x1, y: y1, width: x2 - x1, height: y2 - y1, color: PDFLib.rgb(1, 0.92, 0.23), opacity: 0.4 });
   } else if (activeTool === 'draw') {
     page.drawLine({
       start: { x: drawStart.x * scaleX, y: height - drawStart.y * scaleY },
       end: { x: x * scaleX, y: height - y * scaleY },
-      thickness: 2,
-      color: PDFLib.rgb(0.94, 0.33, 0.31)
+      thickness: 2, color: PDFLib.rgb(0.94, 0.33, 0.31)
     });
   }
 
@@ -379,26 +352,21 @@ $('btn-save').addEventListener('click', async () => {
   URL.revokeObjectURL(url);
 });
 
-// ─── Export Page as PNG ──────────────────────────────────
-$('btn-save-png').addEventListener('click', async () => {
-  const canvas = canvasContainer.querySelector('canvas');
-  if (!canvas) return;
+// ─── Export PNG ──────────────────────────────────────────
+$('btn-save-png').addEventListener('click', () => {
   const a = document.createElement('a');
-  a.href = canvas.toDataURL('image/png');
+  a.href = pdfCanvas.toDataURL('image/png');
   a.download = `page-${currentPage}.png`;
   a.click();
 });
 
-// ─── Tool Options Bar ────────────────────────────────────
+// ─── Tool Options ────────────────────────────────────────
 function showToolOptions(id) {
   $('tool-options').classList.remove('hidden');
   document.querySelectorAll('.tool-option-set').forEach(s => s.classList.add('hidden'));
   $(id).classList.remove('hidden');
 }
-
-function hideToolOptions() {
-  $('tool-options').classList.add('hidden');
-}
+function hideToolOptions() { $('tool-options').classList.add('hidden'); }
 
 // ─── GO ──────────────────────────────────────────────────
 init();
