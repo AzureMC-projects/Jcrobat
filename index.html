@@ -7,302 +7,267 @@
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
-  <!-- Title Bar -->
-  <div class="title-bar">
-    <div class="title-bar-left">
-      <span class="app-icon">📄</span>
-      <span class="app-name">Jcrobat</span>
+  <div class="topbar">
+    <div class="topbar-left">
+      <span class="logo">Jcrobat</span>
       <span class="doc-name" id="doc-name">Sample Document.pdf</span>
     </div>
-    <div class="title-bar-right">
-      <button id="btn-theme" title="Toggle theme">🌙</button>
+    <div class="topbar-right">
+      <span id="page-indicator">Page 1 of 1</span>
+      <span class="sep">|</span>
+      <span id="zoom-indicator">100%</span>
+      <button id="zoom-out" class="icon-btn">−</button>
+      <button id="zoom-in" class="icon-btn">+</button>
+      <button id="btn-fit" class="icon-btn" title="Fit to page">⊡</button>
     </div>
   </div>
 
-  <!-- Ribbon -->
-  <div class="ribbon">
+  <nav class="ribbon">
     <div class="ribbon-tabs">
-      <button class="ribbon-tab active" data-tab="home">Home</button>
-      <button class="ribbon-tab" data-tab="edit">Edit</button>
-      <button class="ribbon-tab" data-tab="organize">Organize</button>
-      <button class="ribbon-tab" data-tab="sign">Sign</button>
-      <button class="ribbon-tab" data-tab="convert">Convert</button>
-      <button class="ribbon-tab" data-tab="view">View</button>
+      <button class="tab active" data-panel="tools">Tools</button>
+      <button class="tab" data-panel="organize">Organize</button>
+      <button class="tab" data-panel="export">Export</button>
     </div>
-    <div class="ribbon-content">
-      <!-- Home Tab -->
-      <div class="ribbon-panel active" id="panel-home">
-        <div class="ribbon-group">
-          <div class="ribbon-group-label">File</div>
-          <div class="ribbon-group-items">
-            <button class="ribbon-btn" id="btn-open" title="Open PDF (Ctrl+O)">
-              <span class="btn-icon">📂</span><span>Open</span>
-            </button>
-            <button class="ribbon-btn" id="btn-save" title="Save/Download (Ctrl+S)">
-              <span class="btn-icon">💾</span><span>Save</span>
-            </button>
-            <button class="ribbon-btn" id="btn-print" title="Print (Ctrl+P)">
-              <span class="btn-icon">🖨️</span><span>Print</span>
-            </button>
-          </div>
-        </div>
-        <div class="ribbon-group">
-          <div class="ribbon-group-label">Quick Actions</div>
-          <div class="ribbon-group-items">
-            <button class="ribbon-btn" id="btn-merge" title="Merge PDFs">
-              <span class="btn-icon">🔀</span><span>Merge</span>
-            </button>
-            <button class="ribbon-btn" id="btn-compress" title="Compress PDF">
-              <span class="btn-icon">📦</span><span>Compress</span>
-            </button>
-          </div>
-        </div>
-        <div class="ribbon-group">
-          <div class="ribbon-group-label">Search</div>
-          <div class="ribbon-group-items">
-            <input type="text" id="search-input" class="ribbon-input" placeholder="Search in document...">
-            <button class="ribbon-btn" id="btn-search-prev">▲</button>
-            <button class="ribbon-btn" id="btn-search-next">▼</button>
-            <span id="search-count" class="search-count"></span>
-          </div>
+
+    <div class="ribbon-panel" id="panel-tools">
+      <div class="ribbon-group">
+        <div class="ribbon-group-label">Annotate</div>
+        <div class="ribbon-group-items">
+          <button id="btn-addtext" class="ribbon-btn"><span class="ribbon-icon">T</span>Text</button>
+          <button id="btn-highlight" class="ribbon-btn"><span class="ribbon-icon">H</span>Highlight</button>
+          <button id="btn-draw" class="ribbon-btn"><span class="ribbon-icon">✎</span>Draw</button>
+          <button id="btn-stamp" class="ribbon-btn"><span class="ribbon-icon">S</span>Stamp</button>
         </div>
       </div>
-
-      <!-- Edit Tab -->
-      <div class="ribbon-panel" id="panel-edit">
-        <div class="ribbon-group">
-          <div class="ribbon-group-label">Comments</div>
-          <div class="ribbon-group-items">
-            <button class="ribbon-btn" id="btn-highlight" title="Highlight (H)">
-              <span class="btn-icon">🖍️</span><span>Highlight</span>
-            </button>
-            <button class="ribbon-btn" id="btn-underline" title="Underline (U)">
-              <span class="btn-icon">U̲</span><span>Underline</span>
-            </button>
-            <button class="ribbon-btn" id="btn-strikethrough" title="Strikethrough (S)">
-              <span class="btn-icon">S̶</span><span>Strike</span>
-            </button>
-            <button class="ribbon-btn" id="btn-freehand" title="Freehand Draw (D)">
-              <span class="btn-icon">✏️</span><span>Draw</span>
-            </button>
-          </div>
-        </div>
-        <div class="ribbon-group">
-          <div class="ribbon-group-label">Shapes</div>
-          <div class="ribbon-group-items">
-            <button class="ribbon-btn" id="btn-rect" title="Rectangle (R)">
-              <span class="btn-icon">▭</span><span>Rect</span>
-            </button>
-            <button class="ribbon-btn" id="btn-ellipse" title="Ellipse (E)">
-              <span class="btn-icon">◯</span><span>Ellipse</span>
-            </button>
-            <button class="ribbon-btn" id="btn-line" title="Line (L)">
-              <span class="btn-icon">╱</span><span>Line</span>
-            </button>
-          </div>
-        </div>
-        <div class="ribbon-group">
-          <div class="ribbon-group-label">Content</div>
-          <div class="ribbon-group-items">
-            <button class="ribbon-btn" id="btn-addtext" title="Add Text (T)">
-              <span class="btn-icon">🔤</span><span>Text</span>
-            </button>
-            <button class="ribbon-btn" id="btn-addimage" title="Add Image">
-              <span class="btn-icon">🖼️</span><span>Image</span>
-            </button>
-            <button class="ribbon-btn" id="btn-addlink" title="Add Link">
-              <span class="btn-icon">🔗</span><span>Link</span>
-            </button>
-            <button class="ribbon-btn" id="btn-fillform" title="Fill Form Fields">
-              <span class="btn-icon">📝</span><span>Forms</span>
-            </button>
-          </div>
-        </div>
-        <div class="ribbon-group">
-          <div class="ribbon-group-label">Color</div>
-          <div class="ribbon-group-items">
-            <input type="color" id="tool-color" value="#ffeb3b" class="ribbon-color">
-            <div class="stroke-width">
-              <label>Size:</label>
-              <input type="range" id="tool-size" min="1" max="20" value="3">
-            </div>
-          </div>
+      <div class="ribbon-group">
+        <div class="ribbon-group-label">Edit</div>
+        <div class="ribbon-group-items">
+          <button id="btn-rotate" class="ribbon-btn"><span class="ribbon-icon">↻</span>Rotate</button>
+          <button id="btn-delete-page" class="ribbon-btn"><span class="ribbon-icon">✕</span>Delete</button>
         </div>
       </div>
-
-      <!-- Organize Tab -->
-      <div class="ribbon-panel" id="panel-organize">
-        <div class="ribbon-group">
-          <div class="ribbon-group-label">Pages</div>
-          <div class="ribbon-group-items">
-            <button class="ribbon-btn" id="btn-rotate-cw" title="Rotate Clockwise">
-              <span class="btn-icon">↻</span><span>Rotate CW</span>
-            </button>
-            <button class="ribbon-btn" id="btn-rotate-ccw" title="Rotate Counter-Clockwise">
-              <span class="btn-icon">↺</span><span>Rotate CCW</span>
-            </button>
-            <button class="ribbon-btn" id="btn-delete-page" title="Delete Page">
-              <span class="btn-icon">🗑️</span><span>Delete</span>
-            </button>
-            <button class="ribbon-btn" id="btn-insert-page" title="Insert Blank Page">
-              <span class="btn-icon">➕</span><span>Insert</span>
-            </button>
-          </div>
-        </div>
-        <div class="ribbon-group">
-          <div class="ribbon-group-label">Reorder</div>
-          <div class="ribbon-group-items">
-            <button class="ribbon-btn" id="btn-page-up" title="Move Page Up">
-              <span class="btn-icon">⬆️</span><span>Up</span>
-            </button>
-            <button class="ribbon-btn" id="btn-page-down" title="Move Page Down">
-              <span class="btn-icon">⬇️</span><span>Down</span>
-            </button>
-          </div>
-        </div>
-        <div class="ribbon-group">
-          <div class="ribbon-group-label">Extract</div>
-          <div class="ribbon-group-items">
-            <input type="text" id="extract-range" class="ribbon-input" placeholder="Pages: 1-3,5">
-            <button class="ribbon-btn" id="btn-extract">Extract</button>
-          </div>
-        </div>
-      </div>
-
-      <!-- Sign Tab -->
-      <div class="ribbon-panel" id="panel-sign">
-        <div class="ribbon-group">
-          <div class="ribbon-group-label">Signature</div>
-          <div class="ribbon-group-items">
-            <button class="ribbon-btn" id="btn-sign-draw" title="Draw Signature">
-              <span class="btn-icon">✍️</span><span>Draw</span>
-            </button>
-            <button class="ribbon-btn" id="btn-sign-type" title="Type Signature">
-              <span class="btn-icon">⌨️</span><span>Type</span>
-            </button>
-            <button class="ribbon-btn" id="btn-sign-image" title="Upload Signature Image">
-              <span class="btn-icon">🖼️</span><span>Image</span>
-            </button>
-          </div>
-        </div>
-        <div class="ribbon-group">
-          <div class="ribbon-group-label">Stamp</div>
-          <div class="ribbon-group-items">
-            <button class="ribbon-btn stamp-btn" data-stamp="APPROVED" style="color:#4caf50">APPROVED</button>
-            <button class="ribbon-btn stamp-btn" data-stamp="CONFIDENTIAL" style="color:#f44336">CONFIDENTIAL</button>
-            <button class="ribbon-btn stamp-btn" data-stamp="DRAFT" style="color:#ff9800">DRAFT</button>
-            <button class="ribbon-btn stamp-btn" data-stamp="COPY" style="color:#2196f3">COPY</button>
-          </div>
-        </div>
-      </div>
-
-      <!-- Convert Tab -->
-      <div class="ribbon-panel" id="panel-convert">
-        <div class="ribbon-group">
-          <div class="ribbon-group-label">Export</div>
-          <div class="ribbon-group-items">
-            <button class="ribbon-btn" id="btn-export-png" title="Export current page as PNG">
-              <span class="btn-icon">🖼️</span><span>Page → PNG</span>
-            </button>
-            <button class="ribbon-btn" id="btn-export-all-png" title="Export all pages as PNG">
-              <span class="btn-icon">📑</span><span>All → PNG</span>
-            </button>
-          </div>
-        </div>
-        <div class="ribbon-group">
-          <div class="ribbon-group-label">Info</div>
-          <div class="ribbon-group-items">
-            <button class="ribbon-btn" id="btn-doc-info" title="Document Properties">
-              <span class="btn-icon">ℹ️</span><span>Properties</span>
-            </button>
-          </div>
-        </div>
-      </div>
-
-      <!-- View Tab -->
-      <div class="ribbon-panel" id="panel-view">
-        <div class="ribbon-group">
-          <div class="ribbon-group-label">Zoom</div>
-          <div class="ribbon-group-items">
-            <button class="ribbon-btn" id="btn-zoom-out" title="Zoom Out (-)">−</button>
-            <span id="zoom-level" class="zoom-display">100%</span>
-            <button class="ribbon-btn" id="btn-zoom-in" title="Zoom In (+)">+</button>
-            <button class="ribbon-btn" id="btn-fit-width" title="Fit Width (0)">Fit W</button>
-            <button class="ribbon-btn" id="btn-fit-page" title="Fit Page (1)">Fit P</button>
-            <button class="ribbon-btn" id="btn-actual-size" title="Actual Size (2)">1:1</button>
-          </div>
-        </div>
-        <div class="ribbon-group">
-          <div class="ribbon-group-label">Layout</div>
-          <div class="ribbon-group-items">
-            <button class="ribbon-btn" id="btn-page-mode" title="Toggle page display">
-              <span class="btn-icon">📐</span><span>Page Mode</span>
-            </button>
-            <button class="ribbon-btn" id="btn-fullscreen" title="Fullscreen (F11)">
-              <span class="btn-icon">⛶</span><span>Fullscreen</span>
-            </button>
-          </div>
-        </div>
-        <div class="ribbon-group">
-          <div class="ribbon-group-label">Navigation</div>
-          <div class="ribbon-group-items">
-            <button class="ribbon-btn" id="btn-prev-page" title="Previous Page (←)">◀</button>
-            <button class="ribbon-btn" id="btn-next-page" title="Next Page (→)">▶</button>
-            <input type="number" id="page-jump" class="ribbon-input page-jump" min="1" value="1">
-            <span class="page-total" id="page-total">/ 1</span>
-          </div>
+      <div class="ribbon-group">
+        <div class="ribbon-group-label">File</div>
+        <div class="ribbon-group-items">
+          <button id="btn-open" class="ribbon-btn"><span class="ribbon-icon">📂</span>Open</button>
+          <button id="btn-save" class="ribbon-btn primary"><span class="ribbon-icon">⬇</span>Download</button>
         </div>
       </div>
     </div>
-  </div>
 
-  <!-- Main Area -->
+    <div class="ribbon-panel hidden" id="panel-organize">
+      <div class="ribbon-group">
+        <div class="ribbon-group-label">Pages</div>
+        <div class="ribbon-group-items">
+          <button id="btn-merge" class="ribbon-btn"><span class="ribbon-icon">⊞</span>Merge</button>
+          <button id="btn-split" class="ribbon-btn"><span class="ribbon-icon">✂</span>Split</button>
+          <button id="btn-page-up" class="ribbon-btn"><span class="ribbon-icon">↑</span>Up</button>
+          <button id="btn-page-down" class="ribbon-btn"><span class="ribbon-icon">↓</span>Down</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="ribbon-panel hidden" id="panel-export">
+      <div class="ribbon-group">
+        <div class="ribbon-group-label">Export</div>
+        <div class="ribbon-group-items">
+          <button id="btn-save" class="ribbon-btn primary"><span class="ribbon-icon">⬇</span>PDF</button>
+          <button id="btn-save-png" class="ribbon-btn"><span class="ribbon-icon">🖼</span>PNG</button>
+        </div>
+      </div>
+    </div>
+  </nav>
+
   <div class="main-area">
-    <!-- Left Panel -->
-    <aside class="left-panel" id="left-panel">
-      <div class="panel-tabs">
-        <button class="panel-tab active" data-panel="thumbnails" title="Pages">📄</button>
-        <button class="panel-tab" data-panel="outline" title="Bookmarks">📑</button>
+    <aside class="sidebar" id="sidebar">
+      <div class="sidebar-header">
+        <span>Pages</span>
+        <button id="btn-toggle-sidebar" class="icon-btn">◀</button>
       </div>
-      <div class="panel-content" id="panel-thumbnails">
-        <div id="thumbnails"></div>
-      </div>
-      <div class="panel-content hidden" id="panel-outline">
-        <div id="outline-list"></div>
-      </div>
+      <div id="page-nav" class="page-nav"></div>
     </aside>
 
-    <!-- Viewer -->
     <main class="viewer" id="viewer">
-      <div id="pages-container"></div>
-      <canvas id="overlay-canvas" class="hidden"></canvas>
+      <div class="page-wrapper" id="page-wrapper">
+        <canvas id="pdf-canvas"></canvas>
+        <canvas id="overlay-canvas" class="hidden"></canvas>
+      </div>
     </main>
   </div>
 
-  <!-- Status Bar -->
-  <footer class="status-bar">
-    <span id="status-page">Page 1 of 1</span>
-    <span id="status-zoom">100%</span>
-    <span id="status-tool" class="status-tool"></span>
-    <span id="status-file" class="status-file"></span>
-    <div class="status-zoom-controls">
-      <button id="btn-status-zoom-out">−</button>
-      <button id="btn-status-zoom-in">+</button>
+  <div class="tool-options hidden" id="tool-options">
+    <div id="text-options" class="tool-option-set hidden">
+      <input type="text" id="text-input" placeholder="Enter text...">
+      <input type="number" id="text-x" placeholder="X" value="50">
+      <input type="number" id="text-y" placeholder="Y" value="700">
+      <input type="number" id="text-size" placeholder="Size" value="24">
+      <select id="text-color">
+        <option value="0,0,0">Black</option>
+        <option value="1,0,0">Red</option>
+        <option value="0,0,1">Blue</option>
+      </select>
+      <button id="btn-apply-text" class="primary">Apply</button>
     </div>
+    <div id="split-options" class="tool-option-set hidden">
+      <span>Pages:</span>
+      <input type="text" id="split-range" placeholder="1-3, 5">
+      <button id="btn-apply-split" class="primary">Extract</button>
+    </div>
+    <div id="stamp-options" class="tool-option-set hidden">
+      <span>Stamp:</span>
+      <input type="text" id="stamp-text" value="CONFIDENTIAL">
+      <button id="btn-apply-stamp" class="primary">Stamp</button>
+    </div>
+  </div>
+
+  <footer class="status-bar">
+    <span id="tool-indicator"></span>
+    <span class="sep">|</span>
+    <span id="file-size"></span>
+    <span class="sep">|</span>
+    <span id="doc-info"></span>
   </footer>
 
-  <!-- Modals -->
-  <div class="modal-overlay hidden" id="modal-text">
-    <div class="modal">
-      <h3>Add Text</h3>
-      <textarea id="text-input" placeholder="Type your text..." rows="3"></textarea>
-      <div class="modal-row">
-        <label>X: <input type="number" id="text-x" value="50"></label>
-        <label>Y: <input type="number" id="text-y" value="700"></label>
-        <label>Size: <input type="number" id="text-size" value="16"></label>
+  <input type="file" id="file-input" accept="application/pdf" hidden>
+  <input type="file" id="merge-input" accept="application/pdf" multiple hidden>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js"></script>
+  <script type="module" src="app.js"></script>
+</body>
+</html>   <!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Jcrobat</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="topbar">
+    <div class="topbar-left">
+      <span class="logo">Jcrobat</span>
+      <span class="doc-name" id="doc-name">Sample Document.pdf</span>
+    </div>
+    <div class="topbar-right">
+      <span id="page-indicator">Page 1 of 1</span>
+      <span class="sep">|</span>
+      <span id="zoom-indicator">100%</span>
+      <button id="zoom-out" class="icon-btn">−</button>
+      <button id="zoom-in" class="icon-btn">+</button>
+      <button id="btn-fit" class="icon-btn" title="Fit to page">⊡</button>
+    </div>
+  </div>
+
+  <nav class="ribbon">
+    <div class="ribbon-tabs">
+      <button class="tab active" data-panel="tools">Tools</button>
+      <button class="tab" data-panel="organize">Organize</button>
+      <button class="tab" data-panel="export">Export</button>
+    </div>
+
+    <div class="ribbon-panel" id="panel-tools">
+      <div class="ribbon-group">
+        <div class="ribbon-group-label">Annotate</div>
+        <div class="ribbon-group-items">
+          <button id="btn-addtext" class="ribbon-btn"><span class="ribbon-icon">T</span>Text</button>
+          <button id="btn-highlight" class="ribbon-btn"><span class="ribbon-icon">H</span>Highlight</button>
+          <button id="btn-draw" class="ribbon-btn"><span class="ribbon-icon">✎</span>Draw</button>
+          <button id="btn-stamp" class="ribbon-btn"><span class="ribbon-icon">S</span>Stamp</button>
+        </div>
       </div>
-      <div class="modal-row">
-        <label>Font:
-          <select id="text-font">
-            <option value="helvetica">Helvetica</option>
-            <op   
+      <div class="ribbon-group">
+        <div class="ribbon-group-label">Edit</div>
+        <div class="ribbon-group-items">
+          <button id="btn-rotate" class="ribbon-btn"><span class="ribbon-icon">↻</span>Rotate</button>
+          <button id="btn-delete-page" class="ribbon-btn"><span class="ribbon-icon">✕</span>Delete</button>
+        </div>
+      </div>
+      <div class="ribbon-group">
+        <div class="ribbon-group-label">File</div>
+        <div class="ribbon-group-items">
+          <button id="btn-open" class="ribbon-btn"><span class="ribbon-icon">📂</span>Open</button>
+          <button id="btn-save" class="ribbon-btn primary"><span class="ribbon-icon">⬇</span>Download</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="ribbon-panel hidden" id="panel-organize">
+      <div class="ribbon-group">
+        <div class="ribbon-group-label">Pages</div>
+        <div class="ribbon-group-items">
+          <button id="btn-merge" class="ribbon-btn"><span class="ribbon-icon">⊞</span>Merge</button>
+          <button id="btn-split" class="ribbon-btn"><span class="ribbon-icon">✂</span>Split</button>
+          <button id="btn-page-up" class="ribbon-btn"><span class="ribbon-icon">↑</span>Up</button>
+          <button id="btn-page-down" class="ribbon-btn"><span class="ribbon-icon">↓</span>Down</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="ribbon-panel hidden" id="panel-export">
+      <div class="ribbon-group">
+        <div class="ribbon-group-label">Export</div>
+        <div class="ribbon-group-items">
+          <button id="btn-save" class="ribbon-btn primary"><span class="ribbon-icon">⬇</span>PDF</button>
+          <button id="btn-save-png" class="ribbon-btn"><span class="ribbon-icon">🖼</span>PNG</button>
+        </div>
+      </div>
+    </div>
+  </nav>
+
+  <div class="main-area">
+    <aside class="sidebar" id="sidebar">
+      <div class="sidebar-header">
+        <span>Pages</span>
+        <button id="btn-toggle-sidebar" class="icon-btn">◀</button>
+      </div>
+      <div id="page-nav" class="page-nav"></div>
+    </aside>
+
+    <main class="viewer" id="viewer">
+      <div class="page-wrapper" id="page-wrapper">
+        <canvas id="pdf-canvas"></canvas>
+        <canvas id="overlay-canvas" class="hidden"></canvas>
+      </div>
+    </main>
+  </div>
+
+  <div class="tool-options hidden" id="tool-options">
+    <div id="text-options" class="tool-option-set hidden">
+      <input type="text" id="text-input" placeholder="Enter text...">
+      <input type="number" id="text-x" placeholder="X" value="50">
+      <input type="number" id="text-y" placeholder="Y" value="700">
+      <input type="number" id="text-size" placeholder="Size" value="24">
+      <select id="text-color">
+        <option value="0,0,0">Black</option>
+        <option value="1,0,0">Red</option>
+        <option value="0,0,1">Blue</option>
+      </select>
+      <button id="btn-apply-text" class="primary">Apply</button>
+    </div>
+    <div id="split-options" class="tool-option-set hidden">
+      <span>Pages:</span>
+      <input type="text" id="split-range" placeholder="1-3, 5">
+      <button id="btn-apply-split" class="primary">Extract</button>
+    </div>
+    <div id="stamp-options" class="tool-option-set hidden">
+      <span>Stamp:</span>
+      <input type="text" id="stamp-text" value="CONFIDENTIAL">
+      <button id="btn-apply-stamp" class="primary">Stamp</button>
+    </div>
+  </div>
+
+  <footer class="status-bar">
+    <span id="tool-indicator"></span>
+    <span class="sep">|</span>
+    <span id="file-size"></span>
+    <span class="sep">|</span>
+    <span id="doc-info"></span>
+  </footer>
+
+  <input type="file" id="file-input" accept="application/pdf" hidden>
+  <input type="file" id="merge-input" accept="application/pdf" multiple hidden>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js"></script>
+  <script type="module" src="app.js"></script>
+</body>
+</html>   
